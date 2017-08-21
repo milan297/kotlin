@@ -457,6 +457,9 @@ class KotlinInjectionTest : AbstractInjectionTest() {
                         val name = "John"
                                     """
             )
+
+            assertSameElements(myFixture.complete(CompletionType.BASIC).flatMap { it.allLookupStrings },
+                               "html")
         }
 
 
