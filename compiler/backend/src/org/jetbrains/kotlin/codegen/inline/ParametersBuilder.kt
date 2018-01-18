@@ -124,7 +124,8 @@ class ParametersBuilder private constructor() {
                 objectType: Type, descriptor: String, inlineLambda: LambdaInfo? = null
         ): ParametersBuilder {
             val builder = newBuilder()
-            if (inlineLambda?.hasDispatchReceiver != false) {
+            val isCrossinlineSuspend = inlineLambda?.let { it.isCrossInline && it.invokeMethodDescriptor.isSuspend } ?: false
+            if (inlineLambda?.hasDispatchReceiver != false && !isCrossinlineSuspend) {
                 //skipped this for inlined lambda cause it will be removed
                 builder.addThis(objectType, inlineLambda != null).lambda = inlineLambda
             }
