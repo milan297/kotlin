@@ -25,6 +25,7 @@ import org.jetbrains.kotlin.ir.expressions.IrDeclarationReference
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.IrExpressionWithCopy
 import org.jetbrains.kotlin.ir.expressions.impl.*
+import org.jetbrains.kotlin.ir.symbols.IrFunctionSymbol
 import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.psiUtil.endOffset
 import org.jetbrains.kotlin.psi.psiUtil.startOffset
@@ -260,6 +261,10 @@ fun Generator.getSuperQualifier(resolvedCall: ResolvedCall<*>): ClassDescriptor?
 }
 
 fun StatementGenerator.pregenerateCall(resolvedCall: ResolvedCall<*>): CallBuilder {
+    context.remapCalleeByFloatingPointComparisonRules(resolvedCall)?.let {
+        return pregenerateCallRemappedByFloatingPointComparisonRules(it, resolvedCall)
+    }
+
     if (resolvedCall.isExtensionInvokeCall()) {
         return pregenerateExtensionInvokeCall(resolvedCall)
     }
@@ -268,6 +273,25 @@ fun StatementGenerator.pregenerateCall(resolvedCall: ResolvedCall<*>): CallBuild
     pregenerateValueArguments(call, resolvedCall)
     return call
 }
+
+fun StatementGenerator.pregenerateCallRemappedByFloatingPointComparisonRules(
+    remapped: IrFunctionSymbol,
+    resolvedCall: ResolvedCall<*>
+): CallBuilder =
+    CallBuilder(resolvedCall, remapped.descriptor, false).apply {
+        callReceiver = SimpleCallReceiver(null, null)
+        val callElement = resolvedCall.call.callElement
+
+        val dispatchReceiver = resolvedCall.dispatchReceiver
+                ?: throw AssertionError("Call should have a dispatch receiver: ${callElement.text}")
+        irValueArgumentsByIndex[0] = generateReceiver(callElement, dispatchReceiver).load()
+
+        val singleResolvedArgument = resolvedCall.valueArgumentsByIndex?.singleOrNull()
+                ?: throw AssertionError("Call should have a single value argument: ${callElement.text}")
+        val singleArgumentExpression = singleResolvedArgument.arguments.singleOrNull()?.getArgumentExpression()
+                ?: throw AssertionError("Call should have a single value argument: ${callElement.text}")
+        irValueArgumentsByIndex[1] = generateExpression(singleArgumentExpression)
+    }
 
 fun StatementGenerator.pregenerateExtensionInvokeCall(resolvedCall: ResolvedCall<*>): CallBuilder {
     val extensionInvoke = resolvedCall.resultingDescriptor

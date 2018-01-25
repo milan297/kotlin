@@ -267,6 +267,8 @@ public interface BindingContext {
 
     WritableSlice<KtFunction, KotlinResolutionCallbacksImpl.LambdaInfo> NEW_INFERENCE_LAMBDA_INFO = new BasicWritableSlice<>(DO_NOTHING);
 
+    WritableSlice<ResolvedCall<?>, KotlinType> FLOATING_POINT_COMPARISON_TYPE = Slices.createSimpleSlice();
+
     @SuppressWarnings("UnusedDeclaration")
     @Deprecated // This field is needed only for the side effects of its initializer
             Void _static_initializer = BasicWritableSlice.initSliceDebugNames(BindingContext.class);

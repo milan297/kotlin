@@ -59,6 +59,7 @@ fun KotlinType.isBoolean(): Boolean = KotlinBuiltIns.isBoolean(this)
 fun KotlinType.isPrimitiveNumberType(): Boolean = KotlinBuiltIns.isPrimitiveType(this) && !isBoolean()
 fun KotlinType.isBooleanOrNullableBoolean(): Boolean = KotlinBuiltIns.isBooleanOrNullableBoolean(this)
 fun KotlinType.isNotNullThrowable(): Boolean = KotlinBuiltIns.isThrowableOrNullableThrowable(this) && !isMarkedNullable
+fun KotlinType.isInt(): Boolean = KotlinBuiltIns.isInt(this)
 
 fun KotlinType.isTypeParameter(): Boolean = TypeUtils.isTypeParameter(this)
 
