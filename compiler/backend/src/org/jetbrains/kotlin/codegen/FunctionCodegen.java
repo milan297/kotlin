@@ -623,7 +623,12 @@ public class FunctionCodegen {
                     functionDescriptor
             );
 
-            if (unwrapped != functionDescriptor || functionDescriptor.getValueParameters().size() != jvmMethodSignature.getValueParameters().size()) {
+            /* For suspend functions their functionDescriptors and jvmMethodSignature both have Continuation parameter,
+             * thus the number of parameters is equal. On recursive call, the parameter is thrown away.
+             * However, when we inline lambda, jvmMethodSignature of `invoke` contains continuation parameter,
+             * while functionDescriptor does not. So, throw away the parameter. */
+            boolean isSuspendLambda = functionDescriptor.getValueParameters().size() != jvmMethodSignature.getValueParameters().size();
+            if (unwrapped != functionDescriptor || isSuspendLambda) {
                 generateLocalVariableTable(
                         mv,
                         new JvmMethodSignature(
