@@ -37,7 +37,8 @@
             <add-to-group group-id="KotlinToolsGroup"/>
         </action>
 
-        <action id="ShowKotlinBytecode" class="org.jetbrains.kotlin.idea.actions.ShowKotlinBytecodeAction"
+        <action id="ShowKotlinBytecode"
+                class="org.jetbrains.kotlin.idea.actions.ShowKotlinBackendCodeAction$JvmBytecode"
                 text="Show Kotlin Bytecode">
             <add-to-group group-id="KotlinToolsGroup"/>
         </action>
