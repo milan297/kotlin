@@ -22,13 +22,19 @@ import org.jetbrains.kotlin.codegen.AsmUtil.*
 import org.jetbrains.kotlin.codegen.StackValue
 import org.jetbrains.kotlin.ir.expressions.IrMemberAccessExpression
 import org.jetbrains.kotlin.ir.expressions.IrStatementOrigin
+import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.resolve.jvm.AsmTypes.OBJECT_TYPE
 import org.jetbrains.kotlin.resolve.jvm.jvmSignature.JvmMethodSignature
 import org.jetbrains.org.objectweb.asm.Type
 import org.jetbrains.org.objectweb.asm.commons.InstructionAdapter
 
 class Equals(val operator: IElementType) : IntrinsicMethod() {
-    override fun toCallable(expression: IrMemberAccessExpression, signature: JvmMethodSignature, context: JvmBackendContext): IrIntrinsicFunction {
+
+    override fun toCallable(
+        expression: IrMemberAccessExpression,
+        signature: JvmMethodSignature,
+        context: JvmBackendContext
+    ): IrIntrinsicFunction {
         val receiverAndArgs = expression.receiverAndArgs().apply {
             assert(size == 2) { "Equals expects 2 arguments, but ${joinToString()}" }
         }
@@ -40,8 +46,7 @@ class Equals(val operator: IElementType) : IntrinsicMethod() {
             rightType = boxType(rightType)
         }
 
-
-        return object: IrIntrinsicFunction(expression, signature, context, listOf(leftType, rightType)) {
+        return object : IrIntrinsicFunction(expression, signature, context, listOf(leftType, rightType)) {
             override fun genInvokeInstruction(v: InstructionAdapter) {
                 val opToken = expression.origin
 
@@ -49,12 +54,27 @@ class Equals(val operator: IElementType) : IntrinsicMethod() {
                     // TODO: always casting to the type of the left operand in case of primitives looks wrong
                     val operandType = if (isPrimitive(leftType)) leftType else OBJECT_TYPE
                     StackValue.cmp(operator, operandType, StackValue.onStack(leftType), StackValue.onStack(rightType))
-                }
-                else {
+                } else {
                     genEqualsForExpressionsOnStack(operator, StackValue.onStack(leftType), StackValue.onStack(rightType))
                 }
                 value.put(Type.BOOLEAN_TYPE, v)
             }
         }
     }
+}
+
+
+class Ieee754Equals(val operandType: Type) : IntrinsicMethod() {
+
+    override fun toCallable(
+        expression: IrMemberAccessExpression,
+        signature: JvmMethodSignature,
+        context: JvmBackendContext
+    ): IrIntrinsicFunction =
+        object : IrIntrinsicFunction(expression, signature, context, listOf(operandType, operandType)) {
+            override fun genInvokeInstruction(v: InstructionAdapter) {
+                StackValue.cmp(KtTokens.EQEQ, operandType, StackValue.onStack(operandType), StackValue.onStack(operandType))
+                    .put(Type.BOOLEAN_TYPE, v)
+            }
+        }
 }

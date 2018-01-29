@@ -21,6 +21,7 @@ import org.jetbrains.kotlin.descriptors.PropertyAccessorDescriptor
 import org.jetbrains.kotlin.ir.descriptors.IrBuiltIns
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.resolve.DescriptorUtils
+import org.jetbrains.org.objectweb.asm.Type
 
 class IrIntrinsicMethods(irBuiltIns: IrBuiltIns) {
 
@@ -31,22 +32,30 @@ class IrIntrinsicMethods(irBuiltIns: IrBuiltIns) {
     init {
         irMapping.put(irBuiltIns.eqeq, Equals(KtTokens.EQEQ))
         irMapping.put(irBuiltIns.eqeqeq, Equals(KtTokens.EQEQEQ))
+        irMapping.put(irBuiltIns.eqeqIeee754Float, Ieee754Equals(Type.FLOAT_TYPE))
+        irMapping.put(irBuiltIns.eqeqIeee754Double, Ieee754Equals(Type.DOUBLE_TYPE))
         irMapping.put(irBuiltIns.booleanNot, Not())
+
         val compare = IrCompareTo()
         irMapping.put(irBuiltIns.lt0, compare)
         irMapping.put(irBuiltIns.lteq0, compare)
         irMapping.put(irBuiltIns.gt0, compare)
         irMapping.put(irBuiltIns.gteq0, compare)
+
+        irMapping.put(irBuiltIns.compareToIeee754Float, Ieee754CompareTo(Type.FLOAT_TYPE))
+        irMapping.put(irBuiltIns.compareToIeee754Double, Ieee754CompareTo(Type.DOUBLE_TYPE))
+
         irMapping.put(irBuiltIns.enumValueOf, IrEnumValueOf())
         irMapping.put(irBuiltIns.noWhenBranchMatchedException, IrNoWhenBranchMatchedException())
         irMapping.put(irBuiltIns.throwNpe, ThrowNPE())
     }
 
     fun getIntrinsic(descriptor: CallableMemberDescriptor): IntrinsicMethod? {
-        return intrinsics.getIntrinsic(descriptor) ?:
-               (if (descriptor is PropertyAccessorDescriptor)
-                   intrinsics.getIntrinsic(DescriptorUtils.unwrapFakeOverride(descriptor.correspondingProperty))
-               else null) ?: irMapping[descriptor.original]
+        intrinsics.getIntrinsic(descriptor)?.let { return it }
+        if (descriptor is PropertyAccessorDescriptor) {
+            return intrinsics.getIntrinsic(DescriptorUtils.unwrapFakeOverride(descriptor.correspondingProperty))
+        }
+        return irMapping[descriptor.original]
     }
 
 }
