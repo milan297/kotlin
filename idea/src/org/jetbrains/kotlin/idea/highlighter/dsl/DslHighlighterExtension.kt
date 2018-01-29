@@ -1,0 +1,52 @@
+/*
+ * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
+ * that can be found in the license/LICENSE.txt file.
+ */
+
+package org.jetbrains.kotlin.idea.highlighter.dsl
+
+import com.intellij.openapi.editor.colors.TextAttributesKey
+import com.intellij.psi.PsiElement
+import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
+import org.jetbrains.kotlin.idea.highlighter.HighlighterExtension
+import org.jetbrains.kotlin.idea.highlighter.KotlinHighlightingColors
+import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.resolve.calls.model.ResolvedCall
+import org.jetbrains.kotlin.resolve.descriptorUtil.annotationClass
+import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameSafe
+import kotlin.math.absoluteValue
+
+class DslHighlighterExtension : HighlighterExtension() {
+    override fun highlightDeclaration(elementToHighlight: PsiElement, descriptor: DeclarationDescriptor): TextAttributesKey? {
+        return null
+    }
+
+    override fun highlightCall(elementToHighlight: PsiElement, resolvedCall: ResolvedCall<*>): TextAttributesKey? {
+        val markerAnnotationFqName = markerAnnotationFqName(resolvedCall) ?: return null
+        return styleForDsl(markerAnnotationFqName)
+    }
+
+    private fun markerAnnotationFqName(resolvedCall: ResolvedCall<*>): FqName? {
+        val markerAnnotation = resolvedCall.resultingDescriptor.annotations.find { annotation ->
+            annotation.annotationClass?.annotations?.any {
+                it.annotationClass?.fqNameSafe?.asString() == "kotlin.DslMarker"
+            } ?: false
+        }
+
+        return markerAnnotation?.fqName
+    }
+
+    companion object {
+        private val numStyles = 5
+
+        private val styles = (1..numStyles).map { index ->
+            TextAttributesKey.createTextAttributesKey("KOTLIN_DSL_STYLE$index", KotlinHighlightingColors.KEYWORD)
+        }
+
+        val descriptionsToStyles = (1..numStyles).associate { index ->
+            "Dsl//Style$index" to styles[index - 1]
+        }
+
+        private fun styleForDsl(markerAnnotationFqName: FqName) = styles[(markerAnnotationFqName.asString().hashCode() % 5).absoluteValue]
+    }
+}
