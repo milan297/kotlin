@@ -43,13 +43,15 @@ class KotlinGradleMultiplatformModuleBuilder : GradleModuleBuilder() {
     override fun getPresentableName() = "Kotlin (Multiplatform - Experimental)"
 
     override fun getDescription() =
-            "Multiplatform projects allow reusing the same code between multiple platforms supported by Kotlin. Such projects are built with Gradle."
+        "Multiplatform projects allow reusing the same code between multiple platforms supported by Kotlin. Such projects are built with Gradle."
 
     override fun createWizardSteps(wizardContext: WizardContext, modulesProvider: ModulesProvider): Array<ModuleWizardStep> {
         super.createWizardSteps(wizardContext, modulesProvider)  // initializes GradleModuleBuilder.myWizardContext
-        return arrayOf(KotlinGradleMultiplatformWizardStep(this, wizardContext),
-                       ExternalModuleSettingsStep(
-                               wizardContext, this, GradleProjectSettingsControl(externalProjectSettings))
+        return arrayOf(
+            KotlinGradleMultiplatformWizardStep(this, wizardContext),
+            ExternalModuleSettingsStep(
+                wizardContext, this, GradleProjectSettingsControl(externalProjectSettings)
+            )
         )
     }
 
@@ -78,10 +80,12 @@ class KotlinGradleMultiplatformModuleBuilder : GradleModuleBuilder() {
         }
     }
 
-    private fun setupPlatformModule(module: Module,
-                                    contentRoot: VirtualFile,
-                                    platformModuleName: String?,
-                                    supportProvider: GradleKotlinFrameworkSupportProvider) {
+    private fun setupPlatformModule(
+        module: Module,
+        contentRoot: VirtualFile,
+        platformModuleName: String?,
+        supportProvider: GradleKotlinFrameworkSupportProvider
+    ) {
         if (platformModuleName.isNullOrEmpty()) return
 
         val sdk = module.rootManager.sdk

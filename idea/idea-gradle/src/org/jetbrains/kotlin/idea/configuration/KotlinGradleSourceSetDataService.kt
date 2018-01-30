@@ -26,7 +26,6 @@ import com.intellij.openapi.externalSystem.service.project.IdeModifiableModelsPr
 import com.intellij.openapi.externalSystem.service.project.manage.AbstractProjectDataService
 import com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil
 import com.intellij.openapi.module.Module
-import com.intellij.openapi.module.isQualifiedModuleNamesEnabled
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.OrderRootType
 import com.intellij.openapi.roots.impl.libraries.LibraryEx
@@ -55,8 +54,8 @@ import java.util.*
 
 interface GradleProjectImportHandler {
     companion object : ProjectExtensionDescriptor<GradleProjectImportHandler>(
-            "org.jetbrains.kotlin.gradleProjectImportHandler",
-            GradleProjectImportHandler::class.java
+        "org.jetbrains.kotlin.gradleProjectImportHandler",
+        GradleProjectImportHandler::class.java
     )
 
     fun importBySourceSet(facet: KotlinFacet, sourceSetNode: DataNode<GradleSourceSetData>)
@@ -67,10 +66,10 @@ class KotlinGradleSourceSetDataService : AbstractProjectDataService<GradleSource
     override fun getTargetDataKey() = GradleSourceSetData.KEY
 
     override fun postProcess(
-            toImport: Collection<DataNode<GradleSourceSetData>>,
-            projectData: ProjectData?,
-            project: Project,
-            modelsProvider: IdeModifiableModelsProvider
+        toImport: Collection<DataNode<GradleSourceSetData>>,
+        projectData: ProjectData?,
+        project: Project,
+        modelsProvider: IdeModifiableModelsProvider
     ) {
         for (sourceSetNode in toImport) {
             val sourceSetData = sourceSetNode.data
@@ -87,10 +86,10 @@ class KotlinGradleProjectDataService : AbstractProjectDataService<ModuleData, Vo
     override fun getTargetDataKey() = ProjectKeys.MODULE
 
     override fun postProcess(
-            toImport: MutableCollection<DataNode<ModuleData>>,
-            projectData: ProjectData?,
-            project: Project,
-            modelsProvider: IdeModifiableModelsProvider
+        toImport: MutableCollection<DataNode<ModuleData>>,
+        projectData: ProjectData?,
+        project: Project,
+        modelsProvider: IdeModifiableModelsProvider
     ) {
         for (moduleNode in toImport) {
             // If source sets are present, configure facets in the their modules
@@ -108,10 +107,10 @@ class KotlinGradleLibraryDataService : AbstractProjectDataService<LibraryData, V
     override fun getTargetDataKey() = ProjectKeys.LIBRARY
 
     override fun postProcess(
-            toImport: MutableCollection<DataNode<LibraryData>>,
-            projectData: ProjectData?,
-            project: Project,
-            modelsProvider: IdeModifiableModelsProvider
+        toImport: MutableCollection<DataNode<LibraryData>>,
+        projectData: ProjectData?,
+        project: Project,
+        modelsProvider: IdeModifiableModelsProvider
     ) {
         if (toImport.isEmpty()) return
         val projectDataNode = toImport.first().parent!! as DataNode<ProjectData>
@@ -123,8 +122,7 @@ class KotlinGradleLibraryDataService : AbstractProjectDataService<LibraryData, V
             val modifiableModel = modelsProvider.getModifiableLibraryModel(ideLibrary) as LibraryEx.ModifiableModelEx
             if (anyNonJvmModules) {
                 detectLibraryKind(modifiableModel.getFiles(OrderRootType.CLASSES))?.let { modifiableModel.kind = it }
-            }
-            else if (ideLibrary is LibraryImpl && (ideLibrary.kind is JSLibraryKind || ideLibrary.kind is CommonLibraryKind)) {
+            } else if (ideLibrary is LibraryImpl && (ideLibrary.kind is JSLibraryKind || ideLibrary.kind is CommonLibraryKind)) {
                 resetLibraryKind(modifiableModel)
             }
         }
@@ -142,8 +140,7 @@ class KotlinGradleLibraryDataService : AbstractProjectDataService<LibraryData, V
                 }
             }
             LOG.info("Could not find field of type PersistentLibraryKind in LibraryImpl.class")
-        }
-        catch (e: Exception) {
+        } catch (e: Exception) {
             LOG.info("Failed to reset library kind", e)
         }
     }
@@ -163,15 +160,17 @@ fun detectPlatformByPlugin(moduleNode: DataNode<ModuleData>): TargetPlatformKind
 }
 
 private fun detectPlatformByLibrary(moduleNode: DataNode<ModuleData>): TargetPlatformKind<*>? {
-    val detectedPlatforms = mavenLibraryIdToPlatform.entries.filter { moduleNode.getResolvedKotlinStdlibVersionByModuleData(listOf(it.key)) != null }.map { it.value }.distinct()
+    val detectedPlatforms =
+        mavenLibraryIdToPlatform.entries.filter { moduleNode.getResolvedKotlinStdlibVersionByModuleData(listOf(it.key)) != null }
+            .map { it.value }.distinct()
     return detectedPlatforms.singleOrNull() ?: detectedPlatforms.firstOrNull { it != TargetPlatformKind.Common }
 }
 
 private fun configureFacetByGradleModule(
-        moduleNode: DataNode<ModuleData>,
-        sourceSetNode: DataNode<GradleSourceSetData>?,
-        ideModule: Module,
-        modelsProvider: IdeModifiableModelsProvider
+    moduleNode: DataNode<ModuleData>,
+    sourceSetNode: DataNode<GradleSourceSetData>?,
+    ideModule: Module,
+    modelsProvider: IdeModifiableModelsProvider
 ): KotlinFacet? {
     if (!moduleNode.isResolved) return null
 
@@ -185,11 +184,12 @@ private fun configureFacetByGradleModule(
     }
 
     val compilerVersion = moduleNode.findAll(BuildScriptClasspathData.KEY).firstOrNull()?.data?.let(::findKotlinPluginVersion)
-                          ?: return null
+            ?: return null
     val platformKind = detectPlatformByPlugin(moduleNode) ?: detectPlatformByLibrary(moduleNode)
 
     val coroutinesProperty = CoroutineSupport.byCompilerArgument(
-            moduleNode.coroutines ?: findKotlinCoroutinesProperty(ideModule.project))
+        moduleNode.coroutines ?: findKotlinCoroutinesProperty(ideModule.project)
+    )
 
     val kotlinFacet = ideModule.getOrCreateFacet(modelsProvider, false)
     kotlinFacet.configureFacet(compilerVersion, coroutinesProperty, platformKind, modelsProvider)

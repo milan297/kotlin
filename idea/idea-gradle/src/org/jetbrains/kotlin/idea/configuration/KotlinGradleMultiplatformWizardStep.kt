@@ -90,10 +90,70 @@ class KotlinGradleMultiplatformWizardStep(
         jsModuleNameComponent.component.document.addDocumentListener(stopSyncEditingListener)
 
         panel.border = BorderFactory.createEmptyBorder(10, 10, 10, 10)
-        panel.add(mainModuleNameComponent, GridBagConstraints(0, GridBagConstraints.RELATIVE, 1, 1, 1.0, 0.0, GridBagConstraints.NORTHWEST, GridBagConstraints.HORIZONTAL, JBUI.insets(10, 0, 0, 0), 0, 0))
-        panel.add(jvmModuleNameComponent, GridBagConstraints(0, GridBagConstraints.RELATIVE, 1, 1, 1.0, 0.0, GridBagConstraints.NORTHWEST, GridBagConstraints.HORIZONTAL, JBUI.emptyInsets(), 0, 0))
-        panel.add(jsModuleNameComponent, GridBagConstraints(0, GridBagConstraints.RELATIVE, 1, 1, 1.0, 0.0, GridBagConstraints.NORTHWEST, GridBagConstraints.HORIZONTAL, JBUI.emptyInsets(), 0, 0))
-        panel.add(JLabel(""), GridBagConstraints(0, GridBagConstraints.RELATIVE, 1, 1, 1.0, 1.0, GridBagConstraints.NORTHWEST, GridBagConstraints.HORIZONTAL, JBUI.emptyInsets(), 0, 0))
+        panel.add(
+            mainModuleNameComponent,
+            GridBagConstraints(
+                0,
+                GridBagConstraints.RELATIVE,
+                1,
+                1,
+                1.0,
+                0.0,
+                GridBagConstraints.NORTHWEST,
+                GridBagConstraints.HORIZONTAL,
+                JBUI.insets(10, 0, 0, 0),
+                0,
+                0
+            )
+        )
+        panel.add(
+            jvmModuleNameComponent,
+            GridBagConstraints(
+                0,
+                GridBagConstraints.RELATIVE,
+                1,
+                1,
+                1.0,
+                0.0,
+                GridBagConstraints.NORTHWEST,
+                GridBagConstraints.HORIZONTAL,
+                JBUI.emptyInsets(),
+                0,
+                0
+            )
+        )
+        panel.add(
+            jsModuleNameComponent,
+            GridBagConstraints(
+                0,
+                GridBagConstraints.RELATIVE,
+                1,
+                1,
+                1.0,
+                0.0,
+                GridBagConstraints.NORTHWEST,
+                GridBagConstraints.HORIZONTAL,
+                JBUI.emptyInsets(),
+                0,
+                0
+            )
+        )
+        panel.add(
+            JLabel(""),
+            GridBagConstraints(
+                0,
+                GridBagConstraints.RELATIVE,
+                1,
+                1,
+                1.0,
+                1.0,
+                GridBagConstraints.NORTHWEST,
+                GridBagConstraints.HORIZONTAL,
+                JBUI.emptyInsets(),
+                0,
+                0
+            )
+        )
         UIUtil.mergeComponentsWithAnchor(panel)
     }
 
@@ -103,8 +163,7 @@ class KotlinGradleMultiplatformWizardStep(
             jvmModuleNameComponent.component.text = mainModuleName + "-jvm"
             jsModuleNameComponent.component.text = mainModuleName + "-js"
 
-        }
-        finally {
+        } finally {
             inSyncUpdate = false
         }
     }
