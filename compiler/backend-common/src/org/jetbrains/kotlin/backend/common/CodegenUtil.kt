@@ -29,6 +29,7 @@ import org.jetbrains.kotlin.resolve.DescriptorUtils
 import org.jetbrains.kotlin.resolve.bindingContextUtil.isUsedAsExpression
 import org.jetbrains.kotlin.resolve.calls.callUtil.getResolvedCall
 import org.jetbrains.kotlin.types.KotlinType
+import org.jetbrains.org.objectweb.asm.tree.MethodNode
 
 object CodegenUtil {
     @JvmStatic
@@ -166,4 +167,15 @@ object CodegenUtil {
     @JvmStatic
     fun getActualDeclarations(file: KtFile): List<KtDeclaration> =
             file.declarations.filterNot(KtDeclaration::hasExpectModifier)
+
+    // Handy debugging routine. Print all instructions from methodNode.
+    @JvmStatic
+    fun textifyMethodNode(node: MethodNode): String {
+        val text = org.jetbrains.org.objectweb.asm.util.Textifier()
+        val tmv = org.jetbrains.org.objectweb.asm.util.TraceMethodVisitor(text)
+        node.instructions.toArray().forEach { it.accept(tmv) }
+        val sw = java.io.StringWriter()
+        text.print(java.io.PrintWriter(sw))
+        return "$sw"
+    }
 }

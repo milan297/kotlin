@@ -124,11 +124,7 @@ class ParametersBuilder private constructor() {
                 objectType: Type, descriptor: String, inlineLambda: LambdaInfo? = null
         ): ParametersBuilder {
             val builder = newBuilder()
-            /* The coroutine lambda is continuation itself, it contains local variables of lambda.
-             * Thus, we need to keep the continuation. */
-            // TODO: Move all fields from lambda's continuation to continuation of enclosing suspend function.
-            val isCrossinlineSuspend = inlineLambda?.let { it.isCrossInline && it.invokeMethodDescriptor.isSuspend } ?: false
-            if (inlineLambda?.hasDispatchReceiver != false && !isCrossinlineSuspend) {
+            if (inlineLambda?.hasDispatchReceiver != false) {
                 //skipped this for inlined lambda cause it will be removed
                 builder.addThis(objectType, inlineLambda != null).lambda = inlineLambda
             }

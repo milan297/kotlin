@@ -2293,12 +2293,55 @@ public class ExpressionCodegen extends KtVisitor<StackValue, StackValue> impleme
         List<ResolvedValueArgument> valueArguments = resolvedCall.getValueArgumentsByIndex();
         assert valueArguments != null : "Failed to arrange value arguments by index: " + resolvedCall.getResultingDescriptor();
 
+        // HACK: It is better to create new parentContext, which knows about suspend inline closures.
+
+        // There are two kinds of `this` in suspend inline lambdas: closure and continuation.
+        // 0) closure is used to store captured variables
+        // 1) continuation is used to store locals and state machine label
+        // Also, there are two kinds of continuation is suspend functions:
+        // 0) continuation, which is used to continue execution after suspension
+        // 1) completion, which is passed as the last parameter and used to continue execution of the caller suspend function after
+        // callee's return.
+        // In case of lambdas the continuation is `this`
+        // Thus, we need to replace `this` two times to get rid of `ALOAD 0`s, which freak the inliner out.
+        // First let closure `this` point to the suspend inline closure and not runtime suspend closure.
+        // See CodegenAnnotatingVisitor::visitLambdaExpression for more info.
+        // Second, let continuation `this` point to completion.
+
+        // let closure `this` point to the suspend inline closure and not runtime suspend closure.
+        KtThisExpression thisExpression = null;
+        if (context instanceof InlineLambdaContext && isSuspendContext()) {
+            for (KtElement element : tempVariables.keySet()) {
+                if (element instanceof KtThisExpression) {
+                    thisExpression = (KtThisExpression) element;
+                    break;
+                }
+            }
+            if (thisExpression != null) {
+                ClassDescriptor classDescriptor = bindingContext.get(CodegenBinding.CLASS_FOR_CALLABLE, context.getFunctionDescriptor());
+                assert classDescriptor != null;
+                tempVariables.put(thisExpression, StackValue.thisOrOuter(this, classDescriptor, false, true));
+            }
+        }
+        // let continuation `this` point to completion
+        StackValue closureThis = null;
+        if (thisExpression != null) {
+            closureThis = tempVariables.get(thisExpression);
+            tempVariables.put(thisExpression, getContinuationParameterFromEnclosingSuspendFunction(resolvedCall));
+        }
+
         DefaultCallArgs defaultArgs =
                 argumentGenerator.generate(
                         valueArguments,
                         new ArrayList<>(resolvedCall.getValueArguments().values()),
                         resolvedCall.getResultingDescriptor()
                 );
+
+        // Restore closure this
+        if (thisExpression != null) {
+            assert(closureThis != null);
+            tempVariables.put(thisExpression, closureThis);
+        }
 
         if (tailRecursionCodegen.isTailRecursion(resolvedCall)) {
             tailRecursionCodegen.generateTailRecursion(resolvedCall);
@@ -2337,16 +2380,20 @@ public class ExpressionCodegen extends KtVisitor<StackValue, StackValue> impleme
         }
     }
 
+    private boolean isSuspendContext() {
+        return CoroutineCodegenUtilKt.unwrapInitialDescriptorForSuspendFunction(context.getFunctionDescriptor()).isSuspend();
+    }
+
     private void putReceiverAndInlineMarkerIfNeeded(
             @NotNull Callable callableMethod,
             @NotNull ResolvedCall<?> resolvedCall,
             @NotNull StackValue receiver,
-            boolean isSuspendCall,
+            boolean isSuspendNoInlineCall,
             boolean isConstructor
     ) {
         boolean isSafeCallOrOnStack = receiver instanceof StackValue.SafeCall || receiver instanceof StackValue.OnStack;
 
-        if (isSuspendCall && !isSafeCallOrOnStack) {
+        if (isSuspendNoInlineCall && !isSafeCallOrOnStack) {
             // Inline markers are used to spill the stack before coroutine suspension
             addInlineMarker(v, true);
         }
@@ -2363,7 +2410,7 @@ public class ExpressionCodegen extends KtVisitor<StackValue, StackValue> impleme
             // IFNULL L1
             // ---- load the rest of the arguments
             // INVOKEVIRTUAL suspendCall()
-            // ---- inlineMarkerBefore()
+            // ---- inlineMarkerAfter()
             // GOTO L2
             // L1
             // ACONST_NULL
@@ -2373,7 +2420,7 @@ public class ExpressionCodegen extends KtVisitor<StackValue, StackValue> impleme
             // The problem is that the stack before the call is not restored in case of null receiver.
             // The solution is to spill stack just after receiver is loaded (after IFNULL) in case of safe call.
             // But the problem is that we should leave the receiver itself on the stack, so we store it in a temporary variable.
-            if (isSuspendCall && isSafeCallOrOnStack) {
+            if (isSuspendNoInlineCall && isSafeCallOrOnStack) {
                 boolean bothReceivers =
                         receiver instanceof CallReceiver
                         && ((CallReceiver) receiver).getDispatchReceiver().type.getSort() != Type.VOID
