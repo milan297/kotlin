@@ -2293,55 +2293,7 @@ public class ExpressionCodegen extends KtVisitor<StackValue, StackValue> impleme
         List<ResolvedValueArgument> valueArguments = resolvedCall.getValueArgumentsByIndex();
         assert valueArguments != null : "Failed to arrange value arguments by index: " + resolvedCall.getResultingDescriptor();
 
-        // HACK: It is better to create new parentContext, which knows about suspend inline closures.
-
-        // There are two kinds of `this` in suspend inline lambdas: closure and continuation.
-        // 0) closure is used to store captured variables
-        // 1) continuation is used to store locals and state machine label
-        // Also, there are two kinds of continuation is suspend functions:
-        // 0) continuation, which is used to continue execution after suspension
-        // 1) completion, which is passed as the last parameter and used to continue execution of the caller suspend function after
-        // callee's return.
-        // In case of lambdas the continuation is `this`
-        // Thus, we need to replace `this` two times to get rid of `ALOAD 0`s, which freak the inliner out.
-        // First let closure `this` point to the suspend inline closure and not runtime suspend closure.
-        // See CodegenAnnotatingVisitor::visitLambdaExpression for more info.
-        // Second, let continuation `this` point to completion.
-
-        // let closure `this` point to the suspend inline closure and not runtime suspend closure.
-        KtThisExpression thisExpression = null;
-        if (context instanceof InlineLambdaContext && isSuspendContext()) {
-            for (KtElement element : tempVariables.keySet()) {
-                if (element instanceof KtThisExpression) {
-                    thisExpression = (KtThisExpression) element;
-                    break;
-                }
-            }
-            if (thisExpression != null) {
-                ClassDescriptor classDescriptor = bindingContext.get(CodegenBinding.CLASS_FOR_CALLABLE, context.getFunctionDescriptor());
-                assert classDescriptor != null;
-                tempVariables.put(thisExpression, StackValue.thisOrOuter(this, classDescriptor, false, true));
-            }
-        }
-        // let continuation `this` point to completion
-        StackValue closureThis = null;
-        if (thisExpression != null) {
-            closureThis = tempVariables.get(thisExpression);
-            tempVariables.put(thisExpression, getContinuationParameterFromEnclosingSuspendFunction(resolvedCall));
-        }
-
-        DefaultCallArgs defaultArgs =
-                argumentGenerator.generate(
-                        valueArguments,
-                        new ArrayList<>(resolvedCall.getValueArguments().values()),
-                        resolvedCall.getResultingDescriptor()
-                );
-
-        // Restore closure this
-        if (thisExpression != null) {
-            assert(closureThis != null);
-            tempVariables.put(thisExpression, closureThis);
-        }
+        DefaultCallArgs defaultArgs = generateArgsReplacingContinuation(resolvedCall, argumentGenerator, valueArguments);
 
         if (tailRecursionCodegen.isTailRecursion(resolvedCall)) {
             tailRecursionCodegen.generateTailRecursion(resolvedCall);
@@ -2380,8 +2332,46 @@ public class ExpressionCodegen extends KtVisitor<StackValue, StackValue> impleme
         }
     }
 
-    private boolean isSuspendContext() {
-        return CoroutineCodegenUtilKt.unwrapInitialDescriptorForSuspendFunction(context.getFunctionDescriptor()).isSuspend();
+    private DefaultCallArgs generateArgsReplacingContinuation(
+            @NotNull ResolvedCall<?> resolvedCall,
+            @NotNull ArgumentGenerator argumentGenerator,
+            List<ResolvedValueArgument> valueArguments
+    ) {
+        // let continuation `this` point to completion
+        // See ClosureGenerationStrategy for more info.
+        StackValue closureThis = null;
+        KtThisExpression thisExpression = null;
+        if (isInlineSuspendLambdaContext()) {
+            for (KtElement element : tempVariables.keySet()) {
+                if (element instanceof KtThisExpression) {
+                    thisExpression = (KtThisExpression) element;
+                    break;
+                }
+            }
+            if (thisExpression != null) {
+                closureThis = tempVariables.get(thisExpression);
+                tempVariables.put(thisExpression, getContinuationParameterFromEnclosingSuspendFunction(resolvedCall));
+            }
+        }
+
+        DefaultCallArgs defaultArgs =
+                argumentGenerator.generate(
+                        valueArguments,
+                        new ArrayList<>(resolvedCall.getValueArguments().values()),
+                        resolvedCall.getResultingDescriptor()
+                );
+
+        // Restore closure this
+        if (thisExpression != null) {
+            assert(closureThis != null);
+            tempVariables.put(thisExpression, closureThis);
+        }
+        return defaultArgs;
+    }
+
+    public boolean isInlineSuspendLambdaContext() {
+        return CoroutineCodegenUtilKt.unwrapInitialDescriptorForSuspendFunction(context.getFunctionDescriptor()).isSuspend() &&
+               context instanceof InlineLambdaContext;
     }
 
     private void putReceiverAndInlineMarkerIfNeeded(
