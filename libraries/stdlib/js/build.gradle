@@ -15,9 +15,9 @@ def builtinsSrcDir2 = "${buildDir}/builtin-sources-for-builtins"
 def commonSrcDir = "${buildDir}/common-sources"
 def commonTestSrcDir = "${buildDir}/common-test-sources"
 def builtinsDir = "${rootDir}/core/builtins"
-def jsLibrariesDir = "${rootDir}/js/js.libraries"
-def jsSrcDir = "${jsLibrariesDir}/src"
-def jsTestSrcDir = "${jsLibrariesDir}/test"
+def jsSrcGeneratedDir = "${rootDir}/js/js.libraries/src/core/generated" // to be removed soon
+def jsSrcDir = "src"
+def jsTestSrcDir = "test"
 def jsSrcJsDir = "${jsSrcDir}/js"
 def jsOutputFile = "${buildDir}/classes/kotlin.js"
 
@@ -32,7 +32,7 @@ sourceSets {
     builtins {
         kotlin {
             srcDir builtinsSrcDir2
-            srcDir "${jsSrcDir}/builtins"
+            srcDir 'runtime'
         }
     }
 
@@ -40,7 +40,7 @@ sourceSets {
         kotlin {
             srcDir builtinsSrcDir
             srcDir jsSrcDir
-            exclude "builtins"
+            srcDir jsSrcGeneratedDir
             srcDir commonSrcDir
         }
     }
@@ -194,7 +194,7 @@ task compileJs(type: JavaExec) {
             if (prefixToRemove != null) sourcePath.substring(prefixToRemove.length()) else sourcePath
         }
 
-        def sourceMapSourcesBaseDirs = [ jsSrcDir, builtinsSrcDir2, builtinsSrcDir, commonSrcDir, rootDir ]
+        def sourceMapSourcesBaseDirs = [ jsSrcDir, jsSrcGeneratedDir, builtinsSrcDir2, builtinsSrcDir, commonSrcDir, rootDir ]
 
         sourceMap.sourcesContent = sourceMap.sources.collect { sourceName ->
             sourceMapSourcesBaseDirs.collect { file("$it/$sourceName") }.find { it.exists() && it.name != "kotlin.js" }?.text
