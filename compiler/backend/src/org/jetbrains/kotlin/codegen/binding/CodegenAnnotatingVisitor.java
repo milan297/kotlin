@@ -305,6 +305,7 @@ class CodegenAnnotatingVisitor extends KtVisitorVoid {
                 (FunctionDescriptor) bindingContext.get(DECLARATION_TO_DESCRIPTOR, functionLiteral);
         // working around a problem with shallow analysis
         if (functionDescriptor == null) return;
+        String name = inventAnonymousClassName();
 
         if (CoroutineUtilKt.isSuspendLambda(functionDescriptor)) {
             SimpleFunctionDescriptor jvmSuspendFunctionView =
@@ -334,11 +335,10 @@ class CodegenAnnotatingVisitor extends KtVisitorVoid {
 
 
             // Generate inline-only closure
-            String name = inventAnonymousClassName();
-            name += "__suspend_inline__" + name.substring(name.lastIndexOf('$'));
+            String inlineClosureName = name + "__suspend_inline__" + name.substring(name.lastIndexOf('$'));
             Collection<KotlinType> supertypes = runtimeTypes.getSupertypesForClosure(jvmSuspendFunctionView);
 
-            String simpleName = name.substring(name.lastIndexOf('/') + 1);
+            String simpleName = inlineClosureName.substring(inlineClosureName.lastIndexOf('/') + 1);
             ClassDescriptor classDescriptor = new SyntheticClassDescriptorForLambda(
                     correctContainerForLambda(jvmSuspendFunctionView),
                     Name.special("<inline-suspend-closure-" + simpleName + ">"),
@@ -347,7 +347,7 @@ class CodegenAnnotatingVisitor extends KtVisitorVoid {
             );
 
             bindingTrace.record(CLASS_FOR_CALLABLE, jvmSuspendFunctionView, classDescriptor);
-            MutableClosure closure = recordClosure(classDescriptor, name);
+            MutableClosure closure = recordClosure(classDescriptor, inlineClosureName);
 
             closure.setSuspend(true);
             closure.setSuspendLambda();
@@ -355,7 +355,6 @@ class CodegenAnnotatingVisitor extends KtVisitorVoid {
             // Generate runtime closure (fallthru)
         }
 
-        String name = inventAnonymousClassName();
         Collection<KotlinType> supertypes = runtimeTypes.getSupertypesForClosure(functionDescriptor);
         ClassDescriptor classDescriptor = recordClassForCallable(functionLiteral, functionDescriptor, supertypes, name);
         MutableClosure closure = recordClosure(classDescriptor, name);
