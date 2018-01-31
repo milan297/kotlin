@@ -25,6 +25,7 @@ import org.jetbrains.kotlin.descriptors.ValueParameterDescriptor
 import org.jetbrains.kotlin.resolve.calls.model.CollectionLiteralKotlinCallArgument
 import org.jetbrains.kotlin.resolve.calls.model.KotlinCallArgument
 import org.jetbrains.kotlin.resolve.calls.model.SimpleKotlinCallArgument
+import org.jetbrains.kotlin.resolve.descriptorUtil.isAnnotationConstructor
 import org.jetbrains.kotlin.resolve.descriptorUtil.isParameterOfAnnotation
 import org.jetbrains.kotlin.resolve.descriptorUtil.module
 import org.jetbrains.kotlin.resolve.multiplatform.ExpectedActualResolver
@@ -76,7 +77,7 @@ fun ValueParameterDescriptor.hasDefaultValue(): Boolean {
 private val ValueParameterDescriptor.isActualParameterWithExpectedDefault: Boolean
     get() {
         val function = containingDeclaration
-        if (function is FunctionDescriptor && function.isActual) {
+        if (function is FunctionDescriptor && (function.isActual || function.isAnnotationConstructor())) {
             with(ExpectedActualResolver) {
                 val expected = function.findCompatibleExpectedForActual(function.module).firstOrNull()
                 return expected is FunctionDescriptor && expected.valueParameters[index].hasDefaultValue()

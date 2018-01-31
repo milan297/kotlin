@@ -17,18 +17,17 @@
 package org.jetbrains.kotlin.resolve.checkers
 
 import com.intellij.openapi.vfs.VfsUtilCore
+import com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.config.AnalysisFlag
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.config.LanguageVersionSettings
 import org.jetbrains.kotlin.descriptors.*
-import org.jetbrains.kotlin.diagnostics.DiagnosticSink
 import org.jetbrains.kotlin.diagnostics.Errors
 import org.jetbrains.kotlin.incremental.components.ExpectActualTracker
-import org.jetbrains.kotlin.psi.KtConstructor
-import org.jetbrains.kotlin.psi.KtDeclaration
-import org.jetbrains.kotlin.psi.KtNamedDeclaration
+import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.hasActualModifier
 import org.jetbrains.kotlin.resolve.BindingContext
+import org.jetbrains.kotlin.resolve.BindingTrace
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
 import org.jetbrains.kotlin.resolve.DescriptorUtils
 import org.jetbrains.kotlin.resolve.descriptorUtil.isAnnotationConstructor
@@ -55,18 +54,21 @@ object ExpectedActualDeclarationChecker : DeclarationChecker {
         if (declaration !is KtNamedDeclaration) return
         if (descriptor !is MemberDescriptor || DescriptorUtils.isEnumEntry(descriptor)) return
 
+        // NB (KOTLIN-CR-1747): this is a temporary line for this review; in master this is refactored and is no longer needed
+        val trace = diagnosticHolder as BindingTrace
+
         if (descriptor.isExpect) {
-            checkExpectedDeclarationHasActual(declaration, descriptor, diagnosticHolder, descriptor.module, expectActualTracker)
+            checkExpectedDeclarationHasActual(declaration, descriptor, trace, descriptor.module, expectActualTracker)
         } else {
             val checkActual = !languageVersionSettings.getFlag(AnalysisFlag.multiPlatformDoNotCheckActual)
-            checkActualDeclarationHasExpected(declaration, descriptor, diagnosticHolder, checkActual)
+            checkActualDeclarationHasExpected(declaration, descriptor, trace, checkActual)
         }
     }
 
     fun checkExpectedDeclarationHasActual(
         reportOn: KtNamedDeclaration,
         descriptor: MemberDescriptor,
-        diagnosticHolder: DiagnosticSink,
+        trace: BindingTrace,
         platformModule: ModuleDescriptor,
         expectActualTracker: ExpectActualTracker
     ) {
@@ -86,7 +88,7 @@ object ExpectedActualDeclarationChecker : DeclarationChecker {
             assert(compatibility.keys.all { it is Incompatible })
             @Suppress("UNCHECKED_CAST")
             val incompatibility = compatibility as Map<Incompatible, Collection<MemberDescriptor>>
-            diagnosticHolder.report(Errors.NO_ACTUAL_FOR_EXPECT.on(reportOn, descriptor, platformModule, incompatibility))
+            trace.report(Errors.NO_ACTUAL_FOR_EXPECT.on(reportOn, descriptor, platformModule, incompatibility))
         } else {
             val actualMembers = compatibility.asSequence()
                 .filter { (compatibility, _) ->
@@ -117,7 +119,7 @@ object ExpectedActualDeclarationChecker : DeclarationChecker {
         this.keys.all { it is Incompatible && it.kind == Compatibility.IncompatibilityKind.STRONG }
 
     private fun checkActualDeclarationHasExpected(
-        reportOn: KtNamedDeclaration, descriptor: MemberDescriptor, diagnosticHolder: DiagnosticSink, checkActual: Boolean
+        reportOn: KtNamedDeclaration, descriptor: MemberDescriptor, trace: BindingTrace, checkActual: Boolean
     ) {
         // Using the platform module instead of the common module is sort of fine here because the former always depends on the latter.
         // However, it would be clearer to find the common module this platform module implements and look for expected there instead.
@@ -132,7 +134,7 @@ object ExpectedActualDeclarationChecker : DeclarationChecker {
                 // we suppress error, because annotation classes can only have one constructor and it's a 100% boilerplate
                 // to require every annotation constructor with additional parameters with default values be marked with the `actual` modifier
                 if (checkActual && !descriptor.isAnnotationConstructor()) {
-                    diagnosticHolder.report(Errors.ACTUAL_MISSING.on(reportOn))
+                    trace.report(Errors.ACTUAL_MISSING.on(reportOn))
                 }
 
                 return
@@ -171,7 +173,7 @@ object ExpectedActualDeclarationChecker : DeclarationChecker {
                 val classDescriptor =
                     (descriptor as? TypeAliasDescriptor)?.expandedType?.constructor?.declarationDescriptor as? ClassDescriptor
                             ?: (descriptor as ClassDescriptor)
-                diagnosticHolder.report(
+                trace.report(
                     Errors.NO_ACTUAL_CLASS_MEMBER_FOR_EXPECTED_CLASS.on(
                         reportOn, classDescriptor, nonTrivialUnfulfilled
                     )
@@ -181,7 +183,18 @@ object ExpectedActualDeclarationChecker : DeclarationChecker {
             assert(compatibility.keys.all { it is Incompatible })
             @Suppress("UNCHECKED_CAST")
             val incompatibility = compatibility as Map<Incompatible, Collection<MemberDescriptor>>
-            diagnosticHolder.report(Errors.ACTUAL_WITHOUT_EXPECT.on(reportOn, descriptor, incompatibility))
+            trace.report(Errors.ACTUAL_WITHOUT_EXPECT.on(reportOn, descriptor, incompatibility))
+        } else {
+            val expected = compatibility[Compatible]!!.first()
+            if (expected is ClassDescriptor && expected.kind == ClassKind.ANNOTATION_CLASS) {
+                val actualConstructor =
+                    (descriptor as? ClassDescriptor)?.constructors?.singleOrNull() ?:
+                    (descriptor as? TypeAliasDescriptor)?.constructors?.singleOrNull()?.underlyingConstructorDescriptor
+                val expectedConstructor = expected.constructors.singleOrNull()
+                if (expectedConstructor != null && actualConstructor != null) {
+                    checkAnnotationConstructors(expectedConstructor, actualConstructor, trace, reportOn)
+                }
+            }
         }
     }
 
@@ -193,4 +206,29 @@ object ExpectedActualDeclarationChecker : DeclarationChecker {
             is CallableMemberDescriptor -> kind == CallableMemberDescriptor.Kind.DECLARATION
             else -> true
         }
+
+    private fun checkAnnotationConstructors(
+        expected: ConstructorDescriptor, actual: ConstructorDescriptor, trace: BindingTrace, reportOn: PsiElement
+    ) {
+        for (expectedParameterDescriptor in expected.valueParameters) {
+            // Actual parameter with the same name is guaranteed to exist because this method is only called for compatible annotations
+            val actualParameterDescriptor = actual.valueParameters.first { it.name == expectedParameterDescriptor.name }
+
+            if (expectedParameterDescriptor.declaresDefaultValue() && actualParameterDescriptor.declaresDefaultValue()) {
+                val expectedParameter =
+                    DescriptorToSourceUtils.descriptorToDeclaration(expectedParameterDescriptor) as? KtParameter ?: continue
+                val actualParameter = DescriptorToSourceUtils.descriptorToDeclaration(actualParameterDescriptor)
+
+                val expectedValue = trace.bindingContext.get(BindingContext.COMPILE_TIME_VALUE, expectedParameter.defaultValue)
+                // TODO: support arguments coming from Java via typealias, see PsiAnnotationMethod.getDefaultValue()
+                val actualValue = (actualParameter as? KtParameter)?.let { parameter ->
+                    trace.bindingContext.get(BindingContext.COMPILE_TIME_VALUE, parameter.defaultValue)
+                }
+                if (expectedValue != actualValue) {
+                    val target = (actualParameter as? KtParameter)?.defaultValue ?: (reportOn as? KtTypeAlias)?.nameIdentifier ?: reportOn
+                    trace.report(Errors.ACTUAL_ANNOTATION_CONFLICTING_DEFAULT_ARGUMENT_VALUE.on(target, actualParameterDescriptor))
+                }
+            }
+        }
+    }
 }
