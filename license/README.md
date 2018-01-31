@@ -27,15 +27,15 @@ the Kotlin IntelliJ IDEA plugin:
      - License: BSD (license/third_party/dart_LICENSE.txt)
      - Origin: Originally part of the Dart compiler, (c) 2011 the Dart Project Authors,
    
- - Path: js/js.libraries/src/core/collections
+ - Path: libraries/stdlib/js/src/core/collections
       - License: Apache 2 (license/third_party/gwt_license.txt)
       - Origin: Derived from GWT, (C) 2007-08 Google Inc.
  
- - Path: js/js.libraries/src/js/long.js
+ - Path: libraries/stdlib/js/src/js/long.js
       - License: Apache 2 (license/third_party/closure-compiler_LICENSE.txt)
       - Origin: Google Closure Library, Copyright 2009 The Closure Library Authors
       
- - Path: js/js.libraries/src/js/polyfills.js
+ - Path: libraries/stdlib/js/src/js/polyfills.js
       - License: Boost Software License 1.0 (license/third_party/boost_LICENSE.txt)
       - Origin: Derived from boost special math functions, Copyright Eric Ford & Hubert Holin 2001.
  
