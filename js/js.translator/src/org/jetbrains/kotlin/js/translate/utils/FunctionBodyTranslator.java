@@ -90,9 +90,8 @@ public final class FunctionBodyTranslator extends AbstractTranslator {
             }
             else {
                 PsiElement element = DescriptorToSourceUtils.descriptorToDeclaration(descriptor);
-                if (element != null) {
-                    context.bindingTrace().report(Errors.EXPECTED_FUNCTION_SOURCE_WITH_DEFAULT_ARGUMENTS_NOT_FOUND.on(element));
-                }
+                assert element != null : "No element found for descriptor: " + descriptor;
+                context.bindingTrace().report(Errors.EXPECTED_FUNCTION_SOURCE_WITH_DEFAULT_ARGUMENTS_NOT_FOUND.on(element));
                 valueParametersForDefaultValue = valueParameters;
             }
         }
